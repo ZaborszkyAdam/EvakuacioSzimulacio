@@ -21,6 +21,7 @@ namespace EvakuacioSzimulacio.Core.Simulation
 		public Vector2 target = Vector2.Zero;
 		public List<RVO> personRVO;
 		public List<ORCAConstraint> personORCAConstraints;
+		Random rnd = new Random();
 
 
 
@@ -143,12 +144,12 @@ namespace EvakuacioSzimulacio.Core.Simulation
 					// Feltételezzük, hogy a p.Speed a MaxSpeed
 					float maxSpeed = p.Speed;
 
-					if (distanceToTarget < 16)
+					if (distanceToTarget < 10)
 					{
 						// Target közel van: lassíts, hogy ne lőj túl rajta
 						v_pref = vectorToTarget;
 					}
-					else if (distanceToTarget > 0)
+					else if (distanceToTarget >= 10)
 					{
 						// Target messze van: menj max. sebességgel
 						v_pref = Vector2.Normalize(vectorToTarget) * maxSpeed;
@@ -413,9 +414,49 @@ namespace EvakuacioSzimulacio.Core.Simulation
 					p.CurrentTile = tileMap.tileMap[tileX, tileY];
 					
 				}
-				
 
-				
+
+
+				float stationaryThreshold = 0.1f;
+				Vector2 deltaPos = p.Position - p.LastPosition;
+
+				if (deltaPos.LengthSquared() < 0.01f) // szinte mozdulatlan
+				{
+					p.StationaryTime += dt;
+					if (p.StationaryTime > stationaryThreshold)
+					{
+						// Adj neki kis véletlenszerű lökést a DesiredVelocity irányához képest
+						Vector2 pertubation = Vector2.Zero;
+						if (p.DesiredVelocity.LengthSquared() > 0.0001f)
+						{
+							Vector2 dirNorm = Vector2.Normalize(p.DesiredVelocity);
+
+							// Véletlenszög -30 és +30 fok között
+							float maxAngleDeg = 90f;
+							float angleRad = MathHelper.ToRadians((float)(rnd.NextDouble() * 2 * maxAngleDeg - maxAngleDeg));
+
+							// 2D vektor elforgatása
+							pertubation = new Vector2(
+								dirNorm.X * (float)Math.Cos(angleRad) - dirNorm.Y * (float)Math.Sin(angleRad),
+								dirNorm.X * (float)Math.Sin(angleRad) + dirNorm.Y * (float)Math.Cos(angleRad)
+							);
+
+							pertubation *= 1f; // erősség skálázása
+						}
+
+						p.Direction += pertubation;
+						p.StationaryTime = 0;
+					}
+				}
+				else
+				{
+					p.StationaryTime = 0;
+				}
+
+				p.LastPosition = p.Position;
+
+
+
 				p.Position += p.Direction * dt / p.CurrentTile.MovementCost;
 
 
@@ -424,6 +465,9 @@ namespace EvakuacioSzimulacio.Core.Simulation
 				//Debug.WriteLine("position :" + p.Position + " speed: " + p.Direction.Length() + " direction: " + p.Direction);
 				p.Hitbox.Center = p.Position;
 				debugpos = p.Position;
+
+
+
 				
 
 

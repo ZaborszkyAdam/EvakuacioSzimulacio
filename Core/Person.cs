@@ -20,6 +20,8 @@ namespace EvakuacioSzimulacio.Core
         public Tile CurrentTile { get; set; }
         public bool IsExited { get; set; }
         public Vector2 Target { get;set; }
+        public Vector2 LastPosition { get; set; }
+        public float StationaryTime { get; set; }
 
         public Person(int id, Texture2D ctorTexture, Vector2 ctorPosition, float ctorSpeed, float circleHitboxRadius)
         {

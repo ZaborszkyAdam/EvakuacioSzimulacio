@@ -69,15 +69,41 @@ namespace EvakuacioSzimulacio
 			//_people[2].Direction = new Vector2(-30, 20);
 			////_people[3].Direction = new Vector2(1, 5);
 
-			int id = 0;
-			foreach (var l in _map.tileMap)
-			{
-				if (l.Type == TileType.Chair && rnd.Next(1, 11) < 7)
-				{
-					_people.Add(new Person(id, _circleTexture, l.Center, rnd.Next(50, 71), 10f));
-					id++;
-				}
-			}
+
+
+			FillFolyoso();
+
+			//int id = 0;
+			//foreach (var l in _map.tileMap)
+			//{
+			//	if (l.Type == TileType.Empty && rnd.Next(1, 11) < 7)
+			//	{
+			//		_people.Add(new Person(id, _circleTexture, l.Center, rnd.Next(50, 71), 10f));
+			//		id++;
+			//	}
+			//}
+			//int id = 0;
+			//foreach (var l in _map.tileMap)
+			//{
+			//	if (l.Center.X == 80f && l.Center.Y > 32f && l.Center.Y < 120f)
+			//	{
+			//		Person p = new Person(id, _circleTexture, l.Center, rnd.Next(50, 71), 10f);
+			//		if(id == 0)
+			//		{
+			//			p.Target = new Vector2(1000, 100);
+			//		}
+			//		else
+			//		{
+			//			p.Target = new Vector2(200, 200);
+			//		}
+			//		_people.Add(p);
+			//		id++;
+			//	}
+			//}
+
+
+
+
 			//_people.Add(new Person(0, _circleTexture, new Vector2(336, 64), rnd.Next(50, 71), 10f));
 			//_people.Add(new Person(1, _circleTexture, new Vector2(368, 127), rnd.Next(50, 71), 10f));
 			//_people.Add(new Person(0, _circleTexture, new Vector2(112, 208), 50, 10f));
@@ -135,16 +161,17 @@ namespace EvakuacioSzimulacio
 					if (_map.tileMap[idxX, idxY].Type == TileType.Empty || _map.tileMap[idxX, idxY].Type == TileType.Chair || _map.tileMap[idxX,idxY].Type == TileType.Exit)
 					{
 						_target = new Vector2(MovedCameraPosition.X, MovedCameraPosition.Y);
-						_movementManager.target = _target;
+						//_movementManager.target = _target;
+						foreach (var p in _people)
+						{
+							p.Target = _target;
+						}
 					}
 				}
 				
 				
 			}
-			foreach(var p in _people)
-			{
-				p.Target = _target;
-			}
+			
 
 			KeyboardState state = Keyboard.GetState();
 			Vector2 move = Vector2.Zero;
@@ -235,6 +262,33 @@ namespace EvakuacioSzimulacio
 				Vector2 next = center + new Vector2(MathF.Cos(angle) * radius, MathF.Sin(angle) * radius);
 				DrawLine(sb, prev, next, color);
 				prev = next;
+			}
+		}
+		public void FillFolyoso()
+		{
+			int id = 0;
+			foreach (var l in _map.tileMap)
+			{
+				if ((int)l.Center.X / 32 < 10 && (int)l.Center.X > 16 && (int)l.Center.Y > 16 && (int)l.Center.Y / 32 < 20 && rnd.Next(1,11) < 6)
+				{
+					Person p = new Person(id, _circleTexture, l.Center, rnd.Next(30, 71), 10f);
+					p.Target = new Vector2(2576, 336);
+					p.lastTarget = p.Target;
+					p.Path = new List<Core.Pathfinding.Node>();
+					p.Path.Add(new Core.Pathfinding.Node(80,(int)l.Center.Y / 32, true));
+					_people.Add(p);
+					id++;
+				}
+				if((int)l.Center.X / 32 > 73 && (int)l.Center.X / 32 < 83 && (int)l.Center.Y > 16 && (int)l.Center.Y / 32 < 20 && rnd.Next(1,11) < 6)
+				{
+					Person p = new Person(id, _circleTexture, l.Center, rnd.Next(30, 71), 10f);
+					p.Target = new Vector2(48, 336);
+					p.lastTarget = p.Target;
+					p.Path = new List<Core.Pathfinding.Node>();
+					p.Path.Add(new Core.Pathfinding.Node(10,(int)l.Center.Y / 32, true));
+					_people.Add(p);
+					id++;
+				}
 			}
 		}
 	}

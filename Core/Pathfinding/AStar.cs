@@ -35,7 +35,7 @@ namespace EvakuacioSzimulacio.Core.Pathfinding
 			//}
 			Node startNode = nodes[(int)start.X, (int)start.Y];
 			Node targetNode = nodes[(int)target.X, (int)target.Y];
-
+			
 
 			List<Node> openList = new List<Node>();
 			List<Node> closedList = new List<Node>();
