@@ -66,13 +66,17 @@ namespace EvakuacioSzimulacio.Core.Simulation
 			float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
 			debuglist.Clear();
 			spatialGrid.Clear();
+			
 			foreach (var p in People)
 			{
 				spatialGrid.AddPerson(p);
+
 			}
 			foreach (Person p in People)
 			{
-				List<Person> nearbyPeople = spatialGrid.GetNearbyPeople(p);
+				//List<Person> nearbyPeople = spatialGrid.GetNearbyPeople(p);
+				List<Person> nearbyPeople = new List<Person>(People); //-------------------------------Ez a két sor a spatial grid kikapcsolására szolgál-------------
+				nearbyPeople.Remove(p);
 				List<Tile> nearbyTiles = spatialGrid.GetNearbyTiles(p);
 				if (float.IsNaN(p.Direction.X))
 				{
@@ -416,7 +420,7 @@ namespace EvakuacioSzimulacio.Core.Simulation
 				}
 
 
-
+				//-------------------------------------------------------------Perturbation------------------------------------------------------------------------
 				float stationaryThreshold = 0.1f;
 				Vector2 deltaPos = p.Position - p.LastPosition;
 
@@ -454,7 +458,7 @@ namespace EvakuacioSzimulacio.Core.Simulation
 				}
 
 				p.LastPosition = p.Position;
-
+				//---------------------------------------------------------------------Perturbation vége---------------------------------------------------------------
 
 
 				p.Position += p.Direction * dt / p.CurrentTile.MovementCost;

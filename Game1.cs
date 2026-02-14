@@ -30,6 +30,8 @@ namespace EvakuacioSzimulacio
 		Random rnd;
 		Texture2D pixel;
 		SpriteFont font;
+		private double fps;
+		private double elapsedTime;
 
 		private List<Person> _exitedPeople;
 
@@ -41,6 +43,8 @@ namespace EvakuacioSzimulacio
 			_graphics.ApplyChanges();
 			Content.RootDirectory = "Content";
 			IsMouseVisible = true;
+			IsFixedTimeStep = false;                    // ne legyen fix timestep
+			_graphics.SynchronizeWithVerticalRetrace = false; // kikapcsolja a V-Sync-et
 		}
 
 		protected override void Initialize()
@@ -76,38 +80,24 @@ namespace EvakuacioSzimulacio
 			//int id = 0;
 			//foreach (var l in _map.tileMap)
 			//{
-			//	if (l.Type == TileType.Empty && rnd.Next(1, 11) < 7)
+			//	if (l.Type == TileType.Chair && rnd.Next(1, 11) < 8)
 			//	{
 			//		_people.Add(new Person(id, _circleTexture, l.Center, rnd.Next(50, 71), 10f));
 			//		id++;
 			//	}
 			//}
-			//int id = 0;
-			//foreach (var l in _map.tileMap)
-			//{
-			//	if (l.Center.X == 80f && l.Center.Y > 32f && l.Center.Y < 120f)
-			//	{
-			//		Person p = new Person(id, _circleTexture, l.Center, rnd.Next(50, 71), 10f);
-			//		if(id == 0)
-			//		{
-			//			p.Target = new Vector2(1000, 100);
-			//		}
-			//		else
-			//		{
-			//			p.Target = new Vector2(200, 200);
-			//		}
-			//		_people.Add(p);
-			//		id++;
-			//	}
-			//}
+
 
 
 
 
 			//_people.Add(new Person(0, _circleTexture, new Vector2(336, 64), rnd.Next(50, 71), 10f));
 			//_people.Add(new Person(1, _circleTexture, new Vector2(368, 127), rnd.Next(50, 71), 10f));
-			//_people.Add(new Person(0, _circleTexture, new Vector2(112, 208), 50, 10f));
-			//_people.Add(new Person(1, _circleTexture, new Vector2(208, 218), 50, 10f));
+
+
+
+			//_people.Add(new Person(0, _circleTexture, new Vector2(112, 208), 10, 10f));
+			//_people.Add(new Person(1, _circleTexture, new Vector2(208, 218), 10, 10f));
 			//_people[0].Target = new Vector2(208, 208);
 			//_people[1].Target = new Vector2(112, 208);
 
@@ -194,6 +184,14 @@ namespace EvakuacioSzimulacio
 			_exitedPeople.AddRange(_people.Where(p => p.IsExited));
 			_people.RemoveAll(p => p.IsExited);
 
+			elapsedTime += gameTime.ElapsedGameTime.TotalSeconds;
+			if(elapsedTime >= 1.0)
+			{
+				fps = 1.0/gameTime.ElapsedGameTime.TotalSeconds;
+				elapsedTime = 0;
+			}
+
+
 			base.Update(gameTime);
 		}
 
@@ -215,13 +213,15 @@ namespace EvakuacioSzimulacio
 
 				
 			}
-			//int i = 0;
-			//foreach(var d in _movementManager.debuglist)
-			//{
-			//	if (i == 1) break;
-			//	i++;
-			//	d.Draw(_spriteBatch);
-			//}
+			int i = 0;
+			foreach (var d in _movementManager.debuglist)
+			{
+				if (i == 1) break;
+				i++;
+				//d.Draw(_spriteBatch);
+			}
+			_spriteBatch.DrawString(font, $"FPS: {fps:F1}", new Vector2(10, 10), Color.Red);
+
 			_spriteBatch.End();
 			if (state.IsKeyDown(Keys.A))
 			{
@@ -269,7 +269,7 @@ namespace EvakuacioSzimulacio
 			int id = 0;
 			foreach (var l in _map.tileMap)
 			{
-				if ((int)l.Center.X / 32 < 10 && (int)l.Center.X > 16 && (int)l.Center.Y > 16 && (int)l.Center.Y / 32 < 20 && rnd.Next(1,11) < 6)
+				if ((int)l.Center.X / 32 < 10 && (int)l.Center.X > 16 && (int)l.Center.Y > 16 && (int)l.Center.Y / 32 < 20 && rnd.Next(1,11) < 11)
 				{
 					Person p = new Person(id, _circleTexture, l.Center, rnd.Next(30, 71), 10f);
 					p.Target = new Vector2(2576, 336);
@@ -279,7 +279,7 @@ namespace EvakuacioSzimulacio
 					_people.Add(p);
 					id++;
 				}
-				if((int)l.Center.X / 32 > 73 && (int)l.Center.X / 32 < 83 && (int)l.Center.Y > 16 && (int)l.Center.Y / 32 < 20 && rnd.Next(1,11) < 6)
+				if((int)l.Center.X / 32 > 73 && (int)l.Center.X / 32 < 83 && (int)l.Center.Y > 16 && (int)l.Center.Y / 32 < 20 && rnd.Next(1,11) < 11)
 				{
 					Person p = new Person(id, _circleTexture, l.Center, rnd.Next(30, 71), 10f);
 					p.Target = new Vector2(48, 336);

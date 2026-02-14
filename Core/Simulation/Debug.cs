@@ -66,13 +66,13 @@ namespace EvakuacioSzimulacio.Core.Simulation
 			// Radius kirajzolása (kör)
 			//DrawCircle(spriteBatch, position, radius, Color.Red);
 			DrawCircle(spriteBatch, position + taucirclemiddle, taucircleradius, Color.Green);
-			DrawCircle(spriteBatch, position + circlemiddle, circleradius, Color.Red);
-			DrawCircle(spriteBatch, position + desiredvelocity + projectedpoint, 4, Color.White);
+			//DrawCircle(spriteBatch, position + circlemiddle, circleradius, Color.Red);
+			//DrawCircle(spriteBatch, position + desiredvelocity + projectedpoint, 4, Color.White);
 
 
 
 			// Velocity vektor kirajzolása
-			DrawLine(spriteBatch, position, (position + velocity), Color.Yellow, 2f);
+			//DrawLine(spriteBatch, position, (position + velocity), Color.Yellow, 2f);
 			//DrawLine(spriteBatch, position + taucirclemiddle, (position + taucirclemiddle + new Vector2(0, 1) * taucircleradius), Color.Brown, 2f);
 			//DrawLine(spriteBatch, position + new Vector2(100, 100), (position + velocity) + new Vector2(100,100), Color.Yellow, 2f);
 			//DrawCircle(spriteBatch, position + new Vector2(100,100), 5, Color.Green);
@@ -82,10 +82,10 @@ namespace EvakuacioSzimulacio.Core.Simulation
 			// DesiredVelocity vektor kirajzolása
 			DrawLine(spriteBatch, position, (position + desiredvelocity), Color.Black, 2f);
 
-			//DrawLine(spriteBatch, position, position + leftaxis, Color.Pink, 2f, 50);
-			//DrawLine(spriteBatch, position, position + rightaxis, Color.Magenta, 2f, 50);
-			DrawLine(spriteBatch, position + orcapoint - orcadirection * 30, position + orcapoint + orcadirection, Color.Chocolate, 2f, 30);
-			DrawLine(spriteBatch, position, position + newveloc, Color.Aqua,1f);
+			DrawLine(spriteBatch, position, position + leftaxis, Color.Pink, 2f, 50);
+			DrawLine(spriteBatch, position, position + rightaxis, Color.Magenta, 2f, 50);
+			//DrawLine(spriteBatch, position + orcapoint - orcadirection * 30, position + orcapoint + orcadirection, Color.Chocolate, 2f, 30);
+			//DrawLine(spriteBatch, position, position + newveloc, Color.Aqua,1f);
 
 			// Target pont kirajzolása
 			//DrawCircle(spriteBatch, target, 5, Color.Blue); // kis kör a targethez
