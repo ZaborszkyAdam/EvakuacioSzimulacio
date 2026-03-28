@@ -22,6 +22,10 @@ namespace EvakuacioSzimulacio.Core
         public Vector2 Target { get;set; }
         public Vector2 LastPosition { get; set; }
         public float StationaryTime { get; set; }
+        public bool pathNeedsRefreshment = false;
+        public float pathTimer = 0.0f;
+        public float pathTimerInterval = 0.5f;
+        public bool hasPerturbated = false;
 
         public Person(int id, Texture2D ctorTexture, Vector2 ctorPosition, float ctorSpeed, float circleHitboxRadius)
         {

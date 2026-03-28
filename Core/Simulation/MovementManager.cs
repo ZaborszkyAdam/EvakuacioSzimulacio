@@ -61,9 +61,42 @@ namespace EvakuacioSzimulacio.Core.Simulation
 			personORCAConstraints = new List<ORCAConstraint>();
 			debuglist = new List<Debug>();
 		}
+		public void RefreshEnvironment()
+		{
+			foreach (var p in People)
+			{
+				p.Direction = Vector2.Zero;
+				p.pathNeedsRefreshment = true;
+			}
+
+			spatialGrid.ClearTiles();
+			Tiles = tileMap.tileMap;
+			foreach (var t in Tiles)
+			{
+				spatialGrid.AddTiles(t);
+			}
+			foreach (var p in People)
+			{
+				p.pathNeedsRefreshment = true;
+			}
+		}
+		public void UpdateReferences(TileMap newMap, List<Person> newPeople)
+		{
+			this.tileMap = newMap;
+			this.Tiles = newMap.tileMap;
+			this.People = newPeople;
+
+			//új spatial grid, mivel a korábbi már nem jó
+			spatialGrid.ClearTiles();
+			foreach (var t in Tiles)
+			{
+				spatialGrid.AddTiles(t);
+			}
+		}
 		public void WhereToMove(GameTime gameTime)
 		{
 			float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
+			if (dt > 0.1f) dt = 0.16f;
 			debuglist.Clear();
 			spatialGrid.Clear();
 			
@@ -74,9 +107,9 @@ namespace EvakuacioSzimulacio.Core.Simulation
 			}
 			foreach (Person p in People)
 			{
-				//List<Person> nearbyPeople = spatialGrid.GetNearbyPeople(p);
-				List<Person> nearbyPeople = new List<Person>(People); //-------------------------------Ez a két sor a spatial grid kikapcsolására szolgál-------------
-				nearbyPeople.Remove(p);
+				List<Person> nearbyPeople = spatialGrid.GetNearbyPeople(p);
+				//List<Person> nearbyPeople = new List<Person>(People); //-------------------------------Ez a két sor a spatial grid kikapcsolására szolgál-------------
+				//nearbyPeople.Remove(p);
 				List<Tile> nearbyTiles = spatialGrid.GetNearbyTiles(p);
 				if (float.IsNaN(p.Direction.X))
 				{
@@ -94,22 +127,73 @@ namespace EvakuacioSzimulacio.Core.Simulation
 
 				//---------------------------------------------------------------------Path kezdődik------------------------------------------------------------------
 				//Először számolja ki a path-ot, azután lépjen
-				if (p.Target != Vector2.Zero && p.Target != p.lastTarget)
+				//if (p.Target != Vector2.Zero && (p.Target != p.lastTarget || p.pathNeedsRefreshment == true))
+				//{
+
+				//	var startCell = new Vector2((int)(p.Position.X / tileMap.tileSize), (int)(p.Position.Y / tileMap.tileSize));
+				//	var targetCell = new Vector2((int)(p.Target.X / tileMap.tileSize), (int)(p.Target.Y / tileMap.tileSize));
+
+				//	List<Node> path = AStarPathfinding.AStarPathFinding(tileMap, startCell, targetCell);
+				//	if (path != null)
+				//	{
+				//		p.Path = new List<Node>(path);
+				//		p.lastTarget = p.Target;
+				//		p.pathNeedsRefreshment = false;
+				//		debugtarget = p.Target;
+				//	}
+
+
+				//}
+
+
+				if (p.pathNeedsRefreshment || p.Target == Vector2.Zero)
 				{
-
-					var startCell = new Vector2((int)(p.Position.X / tileMap.tileSize), (int)(p.Position.Y / tileMap.tileSize));
-					var targetCell = new Vector2((int)(p.Target.X / tileMap.tileSize), (int)(p.Target.Y / tileMap.tileSize));
-
-					List<Node> path = AStarPathfinding.AStarPathFinding(tileMap, startCell, targetCell);
-					if (path != null)
+					var exitPoints = tileMap.GetExitPoints();
+					if (exitPoints.Count > 0)
 					{
-						p.Path = new List<Node>(path);
-						p.lastTarget = p.Target;
-						debugtarget = p.Target;
+						List<Node> bestPath = null;
+						float minCost = float.MaxValue;
+						Vector2 bestTarget = Vector2.Zero;
+
+						var startCell = new Vector2((int)(p.Position.X / tileMap.tileSize), (int)(p.Position.Y / tileMap.tileSize));
+
+						foreach (var exitPos in exitPoints)
+						{
+							var targetCell = new Vector2((int)(exitPos.X / tileMap.tileSize), (int)(exitPos.Y / tileMap.tileSize));
+
+							//A*-ot minden kijáratra lenyomjuk
+							List<Node> currentPath = AStarPathfinding.AStarPathFinding(tileMap, startCell, targetCell);
+
+							if (currentPath != null)
+							{
+								
+								float currentCost = 0;
+								foreach (var node in currentPath)
+									currentCost += tileMap.tileMap[node.X, node.Y].MovementCost;
+
+								if (currentCost < minCost)
+								{
+									minCost = currentCost;
+									bestPath = currentPath;
+									bestTarget = exitPos;
+								}
+							}
+						}
+
+						if (bestPath != null)
+						{
+
+
+							//p.Path = new List<Node>(bestPath);
+							p.Path = SmoothPath(bestPath, p.Position, p.Hitbox.Radius);
+							p.Target = bestTarget;
+							p.lastTarget = bestTarget;
+							p.pathNeedsRefreshment = false;
+						}
 					}
-
-
 				}
+
+
 				if (p.Path != null && p.Path.Count > 0)
 				{
 					p.DesiredVelocity = p.Position - new Vector2(p.Path[0].X * 32, p.Path[0].Y * 32);
@@ -128,13 +212,51 @@ namespace EvakuacioSzimulacio.Core.Simulation
 					int yTarget = (int)nextCellCenter.Y;
 
 					//Debug.WriteLine($"{xTarget / 32} == {xPos / 32} és {yTarget / 32} == {yPos / 32}");
-
-					if (xTarget / tileMap.tileSize == xPos / tileMap.tileSize && yTarget / tileMap.tileSize == yPos / tileMap.tileSize)
+					if(Vector2.Distance(nextCellCenter, p.Position) < tileMap.tileSize / 4)
 					{
 						p.Path.RemoveAt(0);
 						//Debug.WriteLine("removed " + p.Path.Count);
 					}
+					//if (xTarget / tileMap.tileSize == xPos / tileMap.tileSize && yTarget / tileMap.tileSize == yPos / tileMap.tileSize)
+					//{
+					//	p.Path.RemoveAt(0);
+					//	//Debug.WriteLine("removed " + p.Path.Count);
+					//}
 				}
+
+				//path rövidítés, az ágens két szélső sugarából vetített egyenesekkel, így nem fog ütközni önmagában fallal
+				p.pathTimer += dt;
+				if (p.pathTimer >= p.pathTimerInterval && p.Path != null && p.Path.Count > 1)
+				{
+					p.pathTimer = 0;
+
+					
+					int lookAhead = Math.Min(p.Path.Count, 3);
+					int skipTo = -1;
+
+					for (int i = lookAhead - 1; i >= 1; i--)
+					{
+						Vector2 futurePoint = new Vector2(
+							p.Path[i].X * tileMap.tileSize + tileMap.tileSize / 2f,
+							p.Path[i].Y * tileMap.tileSize + tileMap.tileSize / 2f
+						);
+
+						if (IsPathClear(p.Position, futurePoint, p.Hitbox.Radius))
+						{
+							skipTo = i;
+							break;
+						}
+					}
+
+					if (skipTo != -1)
+					{
+						for (int j = 0; j < skipTo; j++)
+						{
+							p.Path.RemoveAt(0);
+						}
+					}
+				}
+
 
 				//------------------------------------------------------------------------Path vége-----------------------------------------------------------
 				//-----------------------------------------------------------------------Desired velocity kiszámolása------------------------------------------
@@ -148,17 +270,27 @@ namespace EvakuacioSzimulacio.Core.Simulation
 					// Feltételezzük, hogy a p.Speed a MaxSpeed
 					float maxSpeed = p.Speed;
 
-					if (distanceToTarget < 10)
+
+					if (p.Path.Count > 1)
 					{
-						// Target közel van: lassíts, hogy ne lőj túl rajta
-						v_pref = vectorToTarget;
+						v_pref = Vector2.Normalize(vectorToTarget) * p.Speed;
 					}
-					else if (distanceToTarget >= 10)
+					else
 					{
-						// Target messze van: menj max. sebességgel
-						v_pref = Vector2.Normalize(vectorToTarget) * maxSpeed;
+						if (distanceToTarget < 10) v_pref = vectorToTarget;
+						else v_pref = Vector2.Normalize(vectorToTarget) * p.Speed;
 					}
-					// Ha distanceToTarget == 0, v_pref marad Vector2.Zero
+					//if (distanceToTarget < 10)
+					//{
+					//	// Target közel van, lassíts, hogy ne lőj túl rajta
+					//	v_pref = vectorToTarget;
+					//}
+					//else if (distanceToTarget >= 10)
+					//{
+					//	// Target messze van, menj max. sebességgel
+					//	v_pref = Vector2.Normalize(vectorToTarget) * maxSpeed;
+					//}
+					//// Ha distanceToTarget == 0, v_pref marad Vector2.Zero
 				}
 				p.DesiredVelocity = v_pref;
 				debugdesired = v_pref;
@@ -201,7 +333,7 @@ namespace EvakuacioSzimulacio.Core.Simulation
 					debugrightaxis = right;
 
 					Vector2 relativeVelocity = p.Direction - nearppl.Direction;
-					float tau = 1.2f; //Mennyi időváltozás legyen az, ami alatt javítanak a helyzetükön
+					float tau = 2.0f; //Mennyi időváltozás legyen az, ami alatt javítanak a helyzetükön
 					Vector2 tauCircleMiddlePoint = betweenVectorTwoCenter / tau;
 					debugtaucirclemiddle = tauCircleMiddlePoint;
 					debugtaucircleradius = sumRadius / tau;
@@ -232,7 +364,77 @@ namespace EvakuacioSzimulacio.Core.Simulation
 					personORCAConstraints.Add(orcaToAdd);
 
 				}
-				
+
+
+
+				// --- FALAK KEZELÉSE ---
+				foreach (var nearTile in nearbyTiles)
+				{
+					if (nearTile.Type == TileType.Wall)
+					{
+						Vector2 toObstacle = nearTile.Center - p.Position;
+						float dist = toObstacle.Length();
+
+						// Egy kicsit nagyobb sugarat használunk a falnak, hogy ne érjenek hozzá
+						float combinedRadius = p.Hitbox.Radius + (tileMap.tileSize / 2f);
+						float avoidanceMargin = 1.5f;
+
+						if (dist < combinedRadius + 10.0f)
+						{
+							Vector2 N = Vector2.Normalize(toObstacle);
+
+							float overlap = combinedRadius + avoidanceMargin - dist;
+
+							Vector2 obstacleEdgePoint = p.Position + N * dist; // A fal pontos széle
+
+							Vector2 HalfPanePoint = p.DesiredVelocity;
+
+							if (overlap > 0)
+							{
+								HalfPanePoint -= N * overlap;
+							}
+
+							Vector2 HalfPaneDirectionVector = new Vector2(-N.Y, N.X); // Merőleges a falra
+
+							personORCAConstraints.Add(new ORCAConstraint(HalfPanePoint, N, HalfPaneDirectionVector));
+						}
+					}
+				}
+				// --- FALAK KEZELÉSE VÉGE ---
+
+
+				//a fal nem kör szerű mása, hanem tényleges négyzetes formában
+				//foreach (var nearTile in nearbyTiles)
+				//{
+				//	if(nearTile.Type == TileType.Wall)
+				//	{
+				//		float closestX = Math.Clamp(p.Position.X, nearTile.Hitbox.TopLeft.X, nearTile.Hitbox.TopLeft.X + nearTile.Hitbox.Width);
+				//		float closestY = Math.Clamp(p.Position.Y, nearTile.Hitbox.TopLeft.Y, nearTile.Hitbox.TopLeft.Y + nearTile.Hitbox.Height);
+				//		Vector2 closestPointOnWall = new Vector2(closestX, closestY);
+
+				//		Vector2 toAgent = p.Position - closestPointOnWall;
+				//		float distance = toAgent.Length();
+
+
+				//		float avoidanceMargin = 2.0f;
+				//		if (distance < p.Hitbox.Radius + avoidanceMargin)
+				//		{
+				//			Vector2 N = (distance > 0.001f) ? toAgent / distance : new Vector2(0, -1);
+
+				//			Vector2 pointOnLine = closestPointOnWall + N * (p.Hitbox.Radius + avoidanceMargin);
+
+				//			Vector2 direction = new Vector2(-N.Y, N.X);
+
+				//			personORCAConstraints.Add(new ORCAConstraint(pointOnLine, -N, direction));
+				//		}
+				//	}
+				//}
+
+
+
+
+
+
 				bool anyViolated = true;
 				int maxIteration = 20;
 				int iteration = 0;
@@ -410,6 +612,15 @@ namespace EvakuacioSzimulacio.Core.Simulation
 						}
 					}
 				}
+
+				// irányvektor ellenőrzése (Ha NaN, nullázzuk)
+				if (float.IsNaN(p.Position.X) || float.IsNaN(p.Position.Y))
+				{
+					p.Position = p.LastPosition;
+				}
+
+				
+
 				if (p.Direction.Length() >= 0)
 				{
 					int tileX = (int)(p.Position.X / tileMap.tileSize);
@@ -421,25 +632,23 @@ namespace EvakuacioSzimulacio.Core.Simulation
 
 
 				//-------------------------------------------------------------Perturbation------------------------------------------------------------------------
-				float stationaryThreshold = 0.1f;
+				float stationaryThreshold = 0.2f;
+				float stationaryThresholdNewPath = 0.5f;
 				Vector2 deltaPos = p.Position - p.LastPosition;
 
-				if (deltaPos.LengthSquared() < 0.01f) // szinte mozdulatlan
+				if (deltaPos.LengthSquared() < 0.05f) 
 				{
 					p.StationaryTime += dt;
-					if (p.StationaryTime > stationaryThreshold)
+					if (p.StationaryTime > stationaryThreshold && p.hasPerturbated == false)
 					{
-						// Adj neki kis véletlenszerű lökést a DesiredVelocity irányához képest
 						Vector2 pertubation = Vector2.Zero;
 						if (p.DesiredVelocity.LengthSquared() > 0.0001f)
 						{
 							Vector2 dirNorm = Vector2.Normalize(p.DesiredVelocity);
 
-							// Véletlenszög -30 és +30 fok között
 							float maxAngleDeg = 90f;
 							float angleRad = MathHelper.ToRadians((float)(rnd.NextDouble() * 2 * maxAngleDeg - maxAngleDeg));
 
-							// 2D vektor elforgatása
 							pertubation = new Vector2(
 								dirNorm.X * (float)Math.Cos(angleRad) - dirNorm.Y * (float)Math.Sin(angleRad),
 								dirNorm.X * (float)Math.Sin(angleRad) + dirNorm.Y * (float)Math.Cos(angleRad)
@@ -449,9 +658,25 @@ namespace EvakuacioSzimulacio.Core.Simulation
 						}
 
 						p.Direction += pertubation;
+						p.hasPerturbated = true;
+					}
+					if (p.StationaryTime > stationaryThresholdNewPath)
+					{
+						p.pathNeedsRefreshment = true;
+						p.hasPerturbated = false;
 						p.StationaryTime = 0;
 					}
 				}
+				//else if(deltaPos.LengthSquared() < 0.2f)
+				//{
+				//	p.StationaryTime += dt;
+				//	if (p.StationaryTime > stationaryThresholdNewPath)
+				//	{
+				//		p.pathNeedsRefreshment = true;
+				//		p.hasPerturbated = false;
+				//		p.StationaryTime = 0;
+				//	}
+				//}
 				else
 				{
 					p.StationaryTime = 0;
@@ -518,20 +743,14 @@ namespace EvakuacioSzimulacio.Core.Simulation
 		}
 		private static Vector2 ProjectOntoRay(Vector2 v, Vector2 rayDir)
 		{
-			// 1. Skaláris vetítés kiszámítása
-			// Képlet: (v · rayDir) / |rayDir|^2
 			float scalar_proj = Vector2.Dot(v, rayDir) / rayDir.LengthSquared();
 
-			// 2. Csúcs (origó) ellenőrzése
 			if (scalar_proj <= 0)
 			{
-				// Ha a skaláris projektálás nulla vagy negatív, 
-				// a vetület a sugár kezdőpontjához (origóhoz) van a legközelebb.
 				return Vector2.Zero;
 			}
 			else
 			{
-				// 3. Vetület a sugáron
 				return rayDir * scalar_proj;
 			}
 		}
@@ -546,6 +765,90 @@ namespace EvakuacioSzimulacio.Core.Simulation
 			// Vetített pont
 			Vector2 closestPoint = P + dirNormalized * t;
 			return closestPoint;
+		}
+
+
+		public bool IsPathClear(Vector2 start, Vector2 end, float agentRadius)
+		{
+			Vector2 direction = end - start;
+			float distance = direction.Length();
+			if (distance < 1f) return true;
+
+			direction.Normalize();
+
+			Vector2 normal = new Vector2(-direction.Y, direction.X);
+
+			Vector2 leftStart = start + normal * agentRadius;
+			Vector2 rightStart = start - normal * agentRadius;
+
+			Vector2 leftEnd = end + normal * agentRadius;
+			Vector2 rightEnd = end - normal * agentRadius;
+
+			if (!CheckLine(leftStart, leftEnd)) return false;
+			if (!CheckLine(rightStart, rightEnd)) return false;
+
+			return true;
+		}
+
+		private bool CheckLine(Vector2 s, Vector2 e)
+		{
+			float dist = Vector2.Distance(s, e);
+			Vector2 dir = Vector2.Normalize(e - s);
+
+			float step = tileMap.tileSize / 2f;
+
+			for (float d = 0; d <= dist; d += step)
+			{
+				Vector2 p = s + dir * d;
+				int gx = (int)(p.X / tileMap.tileSize);
+				int gy = (int)(p.Y / tileMap.tileSize);
+
+				if (gx < 0 || gx >= tileMap.tileMap.GetLength(0) || gy < 0 || gy >= tileMap.tileMap.GetLength(1))
+					return false;
+
+				if (tileMap.tileMap[gx, gy].Type == TileType.Wall)
+					return false;
+			}
+			return true;
+		}
+		public List<Node> SmoothPath(List<Node> originalPath, Vector2 currentPos, float agentRadius)
+		{
+			if (originalPath == null || originalPath.Count < 2) return originalPath;
+
+			List<Node> smoothed = new List<Node>();
+			Vector2 currentCheckStart = currentPos;
+			int index = 0;
+
+			while (index < originalPath.Count)
+			{
+				int bestIndex = index;
+
+				// melyik a legtávolabbi, amit még belátunk a két szélünkkel?
+				for (int i = originalPath.Count - 1; i >= index; i--)
+				{
+					Vector2 targetWorldPos = new Vector2(
+						originalPath[i].X * tileMap.tileSize + tileMap.tileSize / 2,
+						originalPath[i].Y * tileMap.tileSize + tileMap.tileSize / 2
+					);
+
+					if (IsPathClear(currentCheckStart, targetWorldPos, agentRadius))
+					{
+						bestIndex = i;
+						break;
+					}
+				}
+
+				smoothed.Add(originalPath[bestIndex]);
+
+				currentCheckStart = new Vector2(
+					originalPath[bestIndex].X * tileMap.tileSize + tileMap.tileSize / 2,
+					originalPath[bestIndex].Y * tileMap.tileSize + tileMap.tileSize / 2
+				);
+
+				index = bestIndex + 1;
+			}
+
+			return smoothed;
 		}
 	}
 	public class RVO

@@ -19,7 +19,7 @@ namespace EvakuacioSzimulacio.Core.Pathfinding
 			{
 				for(int j = 0; j < height; j++)
 				{
-					nodes[i, j] = new Node(i, j, map.tileMap[i,j].Type == TileType.Empty || map.tileMap[i,j].Type == TileType.Chair || map.tileMap[i,j].Type == TileType.Exit);
+					nodes[i, j] = new Node(i, j, map.tileMap[i,j].Type == TileType.Empty || map.tileMap[i,j].Type == TileType.Chair || map.tileMap[i,j].Type == TileType.Exit || map.tileMap[i,j].Type == TileType.Spawn);
 				}
 			}
 			;

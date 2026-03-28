@@ -57,9 +57,9 @@ namespace EvakuacioSzimulacio.Core.Simulation
 			List<Person> nearbyPeople = new List<Person>();
 			var (cellX, cellY) = GetCellNumber(p.Position);
 
-			for(int i = -1; i <= 1; i++)
+			for(int i = -2; i <= 2; i++)
 			{
-				for(int j = -1; j <= 1; j++)
+				for(int j = -2; j <= 2; j++)
 				{
 					int idxX = cellX + i;
 					int idxY = cellY + j;
