@@ -1,5 +1,7 @@
 ﻿using EvakuacioSzimulacio.Core;
 using EvakuacioSzimulacio.Core.Simulation;
+using EvakuacioSzimulacio.Core.Statistics;
+
 //using Microsoft.VisualBasic.Devices;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -38,14 +40,24 @@ namespace EvakuacioSzimulacio
 		private List<Person> _exitedPeople;
 		private TileType _selectedBrush = TileType.Wall;
 
-		public enum GameState { Simulation, Editor, Menu, Load }
+		public enum GameState { Simulation, Editor, Menu, Load, StatisticsMenu, Statistics }
 		private GameState _currentState = GameState.Menu;
 
 
 		private string mapsFolder = "maps";
 		private List<string> _mapFiles = new List<string>();
 		private int _selectedMapIndex = 0;
-		
+		private SimulationLogger logger;
+		private bool isLoggerInitialized = false;
+		private float logTimer = 0.1f;
+		private float logInterval = 0.1f;
+		private float simulationTimer = 0.0f;
+
+		private StatisticsManager _statisticsManager;
+		private List<string> _simulationFiles = new List<string>();
+		private int _selectedFileIndex = 0;
+		private string savesFolder = "saves";
+		private string _currentMapFileName = "default.csv";
 		
 		public Game1()
 		{
@@ -74,10 +86,15 @@ namespace EvakuacioSzimulacio
 			{
 				System.IO.Directory.CreateDirectory(mapsFolder);
 			}
+
 			
 			_people = new List<Person>{};
 			_movementManager = new MovementManager(_people,_map);
 
+			if (!System.IO.Directory.Exists(savesFolder))
+			{
+				System.IO.Directory.CreateDirectory(savesFolder);
+			}
 			
 		}
 
@@ -89,7 +106,32 @@ namespace EvakuacioSzimulacio
 			pixel.SetData(new[] { Color.White });
 			font = Content.Load<SpriteFont>("default");
 
+
 		}
+		
+		private void StartLogging()
+		{
+			if (logger != null)
+			{
+				logger.Finish();
+			}
+
+			string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+			string fileName = "sim_" + timestamp + ".bin";
+
+			logger = new SimulationLogger(fileName);
+
+			logger.WriteHeader(
+				_map.tileMap.GetLength(0),
+				_map.tileMap.GetLength(1),
+				_map.tileSize,
+				_currentMapFileName
+			);
+
+			isLoggerInitialized = true;
+		}
+		
+
 		protected override void Update(GameTime gameTime)
 		{
 			if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape))
@@ -98,9 +140,14 @@ namespace EvakuacioSzimulacio
 				if (_currentState != GameState.Menu)
 				{
 					_currentState = GameState.Menu;
+					simulationTimer = 0.0f;
 				}
 				else
 				{
+					if (isLoggerInitialized && logger != null)
+					{
+						logger.Finish();
+					}
 					Exit();
 				}
 			}
@@ -134,6 +181,8 @@ namespace EvakuacioSzimulacio
 					}
 					_movementManager.UpdateReferences(_map, _people);
 					_movementManager.RefreshEnvironment();
+
+					StartLogging();
 				}
 				ResetElapsedTime();
 				_currentState = GameState.Simulation;
@@ -142,6 +191,16 @@ namespace EvakuacioSzimulacio
 			{
 				_currentState = GameState.Load;
 			}
+			if (kState.IsKeyDown(Keys.H))
+			{
+				if (Directory.Exists(savesFolder))
+				{
+					_simulationFiles = Directory.GetFiles(savesFolder, "*.bin").Select(Path.GetFileName).ToList();
+					_selectedFileIndex = 0;
+					_currentState = GameState.StatisticsMenu;
+					Thread.Sleep(200);
+				}
+			}
 
 			switch( _currentState )
 			{
@@ -149,6 +208,8 @@ namespace EvakuacioSzimulacio
 				case GameState.Editor:EditorUpdate(gameTime); break;
 				case GameState.Simulation:SimultaionUpdate(gameTime); break;
 				case GameState.Load:LoadUpdate(gameTime); break;
+				case GameState.StatisticsMenu:StatisticsMenuUpdate(gameTime); break;
+				case GameState.Statistics:StatisticsUpdate(gameTime); break;
 			}
 
 
@@ -302,19 +363,31 @@ namespace EvakuacioSzimulacio
 			_exitedPeople.AddRange(_people.Where(p => p.IsExited));
 			_people.RemoveAll(p => p.IsExited);
 
+
+			simulationTimer += (float)gameTime.ElapsedGameTime.TotalSeconds;
+			if (isLoggerInitialized)
+			{
+				logTimer += (float)gameTime.ElapsedGameTime.TotalSeconds;
+				if (logTimer >= logInterval)
+				{
+					logger.LogSnapshot(_people, simulationTimer);
+					logTimer = 0;
+				}
+			}
+
 			elapsedTime += gameTime.ElapsedGameTime.TotalSeconds;
 			if(elapsedTime >= 1.0)
 			{
 				fps = 1.0/gameTime.ElapsedGameTime.TotalSeconds;
 				elapsedTime = 0;
 			}
+			
 		}
 
 		protected void LoadUpdate(GameTime gametime)
 		{
 			var kState = Keyboard.GetState();
 
-			// Fájllista beolvasása, ha még üres (vagy frissíteni akarod)
 			if (_mapFiles.Count == 0 && Directory.Exists(mapsFolder))
 			{
 				_mapFiles = Directory.GetFiles(mapsFolder, "*.csv")
@@ -324,15 +397,13 @@ namespace EvakuacioSzimulacio
 
 			if (_mapFiles.Count > 0)
 			{
-				// Navigáció FEL
 				if (kState.IsKeyDown(Keys.Up))
 				{
 					_selectedMapIndex--;
 					if (_selectedMapIndex < 0) _selectedMapIndex = _mapFiles.Count - 1;
-					Thread.Sleep(150); // Megállítjuk egy pillanatra, hogy ne pörögjön túl
+					Thread.Sleep(150);
 				}
 
-				// Navigáció LE
 				if (kState.IsKeyDown(Keys.Down))
 				{
 					_selectedMapIndex++;
@@ -350,17 +421,15 @@ namespace EvakuacioSzimulacio
 						{
 							File.Delete(fileToDelete);
 
-							// Frissítjük a belső listát, hogy eltűnjön a kijelzőről
 							_mapFiles.RemoveAt(_selectedMapIndex);
 
-							// Index korrigálása, hogy ne mutassunk túl a listán
 							if (_selectedMapIndex >= _mapFiles.Count)
 							{
 								_selectedMapIndex = Math.Max(0, _mapFiles.Count - 1);
 							}
 
 							System.Diagnostics.Debug.WriteLine($"Torolve: {fileToDelete}");
-							Thread.Sleep(250); // Hosszabb sleep, hogy ne töröljünk véletlenül többet
+							Thread.Sleep(250);
 						}
 						catch (Exception ex)
 						{
@@ -369,24 +438,98 @@ namespace EvakuacioSzimulacio
 					}
 				}
 
-				// Kiválasztás ENTER-rel
 				if (kState.IsKeyDown(Keys.Enter))
 				{
 					string selectedPath = Path.Combine(mapsFolder, _mapFiles[_selectedMapIndex]);
+					_currentMapFileName = _mapFiles[_selectedMapIndex];
 
-					// Tényleges betöltés
 					_map.LoadFromFile(selectedPath);
 
-					// Fontos: Referenciák frissítése a betöltött adatokkal
-					_people.Clear(); // Betöltésnél általában tiszta lapot akarunk az embereknek
+					_people.Clear();
 					_movementManager.UpdateReferences(_map, _people);
 					_movementManager.RefreshEnvironment();
 
-					// Visszalépés az Editorba a betöltött pályával
 					_currentState = GameState.Editor;
-					_mapFiles.Clear(); // Kiürítjük a listát a következő megnyitásig
+					_mapFiles.Clear();
 					Thread.Sleep(200);
 				}
+			}
+		}
+		protected void StatisticsMenuUpdate(GameTime gameTime)
+		{
+			var kState = Keyboard.GetState();
+
+			if (kState.IsKeyDown(Keys.Up))
+			{
+				_selectedFileIndex--;
+				if (_selectedFileIndex < 0) _selectedFileIndex = _simulationFiles.Count - 1;
+				Thread.Sleep(150);
+			}
+
+			if (kState.IsKeyDown(Keys.Down))
+			{
+				_selectedFileIndex++;
+				if (_selectedFileIndex >= _simulationFiles.Count) _selectedFileIndex = 0;
+				Thread.Sleep(150);
+			}
+
+			if (kState.IsKeyDown(Keys.Enter) && _simulationFiles.Count > 0)
+			{
+				string selectedPath = Path.Combine(savesFolder, _simulationFiles[_selectedFileIndex]);
+
+				int w, h, t;
+				string mapName;
+
+				using (BinaryReader br = new BinaryReader(File.Open(selectedPath, FileMode.Open)))
+				{
+					br.ReadInt32(); // Identifikáló rész, hogy tényleg a mi mentésünk volt-e és nem csak egy random fájl
+					br.ReadInt32(); // Version
+					w = br.ReadInt32();
+					h = br.ReadInt32();
+					t = br.ReadInt32();
+					mapName = br.ReadString();
+				}
+
+				_map = new TileMap(GraphicsDevice, w, h);
+				if (File.Exists(Path.Combine(mapsFolder, mapName)))
+				{
+					_map.LoadFromFile(Path.Combine(mapsFolder, mapName));
+				}
+
+				_statisticsManager = new StatisticsManager(w, h, t);
+				_statisticsManager.AddStatistic(new HeatMap());
+
+				_statisticsManager.ProcessFile(selectedPath);
+
+				_currentState = GameState.Statistics;
+				_camera.Move(Vector2.Zero);
+				_camera.Update();
+				Thread.Sleep(150);
+			}
+		}
+
+		protected void StatisticsUpdate(GameTime gameTime)
+		{
+			var kState = Keyboard.GetState();
+
+			Vector2 move = Vector2.Zero;
+			if (kState.IsKeyDown(Keys.Up)) move.Y -= 1;
+			if (kState.IsKeyDown(Keys.Down)) move.Y += 1;
+			if (kState.IsKeyDown(Keys.Left)) move.X -= 1;
+			if (kState.IsKeyDown(Keys.Right)) move.X += 1;
+
+			if (move != Vector2.Zero) move.Normalize();
+			_camera.Move(move);
+
+			var mouse = Mouse.GetState();
+			
+
+			_camera.Update();
+
+			if (kState.IsKeyDown(Keys.Escape))
+			{
+				_currentState = GameState.StatisticsMenu;
+				Thread.Sleep(150);
 			}
 		}
 
@@ -401,6 +544,8 @@ namespace EvakuacioSzimulacio
 				case GameState.Editor:EditorDraw(gameTime); break;
 				case GameState.Simulation:SimultaionDraw(gameTime); break;
 				case GameState.Load:LoadDraw(gameTime); break;
+				case GameState.StatisticsMenu:StatisticsMenuDraw(gameTime); break;
+				case GameState.Statistics:StatisticsDraw(gameTime); break;
 			}
 
 
@@ -422,11 +567,10 @@ namespace EvakuacioSzimulacio
 
 			_map.Draw(_spriteBatch);
 
-			// Kiszámoljuk hol van az egér a rácson (hogy rajzolhassunk egy kijelölőt)
+			// Kiszámoljuk hol van az egér a rácson
 			var mouse = Mouse.GetState();
 			Vector2 worldPos = Vector2.Transform(new Vector2(mouse.X, mouse.Y), Matrix.Invert(_camera.Transform));
 
-			// Cellára pattintott koordináták (Snap to grid)
 			int gx = (int)worldPos.X / _map.tileSize * _map.tileSize;
 			int gy = (int)worldPos.Y / _map.tileSize * _map.tileSize;
 
@@ -434,13 +578,11 @@ namespace EvakuacioSzimulacio
 			if (gx >= 0 && gx < _map.tileMap.GetLength(0) * _map.tileSize &&
 				gy >= 0 && gy < _map.tileMap.GetLength(1) * _map.tileSize)
 			{
-				// Használd a korábban létrehozott 'pixel' textúrádat egy kis átlátszósággal
 				_spriteBatch.Draw(pixel, new Rectangle(gx, gy, _map.tileSize, _map.tileSize), Color.White * 0.4f);
 			}
 
 			_spriteBatch.End();
 
-			// 2. UI RAJZOLÁSA (Kamera nélkül, fixen a képernyő sarkába)
 			_spriteBatch.Begin();
 
 			string brushInfo = $"Ecset: {_selectedBrush} (1: Fal, 2: Ures, 3: Szek, 4: Kijarat)";
@@ -508,7 +650,42 @@ namespace EvakuacioSzimulacio
 
 			_spriteBatch.End();
 		}
+		protected void StatisticsMenuDraw(GameTime gameTime)
+		{
+			_spriteBatch.Begin();
+			_spriteBatch.DrawString(font, "STATISZTIKA VALASZTO (Bin fjlok)", new Vector2(100, 50), Color.Gold);
 
+			for (int i = 0; i < _simulationFiles.Count; i++)
+			{
+				Color textColor = (i == _selectedFileIndex) ? Color.Lime : Color.White;
+				string prefix = (i == _selectedFileIndex) ? ">> " : "   ";
+				_spriteBatch.DrawString(font, prefix + _simulationFiles[i], new Vector2(120, 100 + (i * 30)), textColor);
+			}
+
+			if (_simulationFiles.Count == 0)
+			{
+				_spriteBatch.DrawString(font, "Nincs mentett szimulacio a 'saves' mappaban!", new Vector2(120, 100), Color.Red);
+			}
+			_spriteBatch.End();
+		}
+
+		protected void StatisticsDraw(GameTime gameTime)
+		{
+			_spriteBatch.Begin(transformMatrix: _camera.Transform);
+
+			_map.Draw(_spriteBatch);
+
+			if (_statisticsManager != null)
+			{
+				_statisticsManager.Draw(_spriteBatch, pixel);
+			}
+
+			_spriteBatch.End();
+
+			_spriteBatch.Begin();
+			_spriteBatch.DrawString(font, "HEAT MAP NEZET - ESC: Vissza", new Vector2(20, 20), Color.White);
+			_spriteBatch.End();
+		}
 
 		public void DrawLine(SpriteBatch sb, Vector2 start, Vector2 end, Color color, float thickness = 1f)
 		{

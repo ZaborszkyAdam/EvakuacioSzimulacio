@@ -7,7 +7,7 @@ namespace EvakuacioSzimulacio.Core
 {
 	internal class Person
 	{
-        private int ID { get; set; }
+        internal int ID { get; set; }
         private Vector2 direction;
 		Texture2D texture;
 		public Vector2 Position { get; set; }
