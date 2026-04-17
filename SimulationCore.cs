@@ -20,7 +20,7 @@ using System.Threading;
 
 namespace EvakuacioSzimulacio
 {
-	public class Game1 : Game
+	public class SimulationCore : Game
 	{
 		private GraphicsDeviceManager _graphics;
 		private SpriteBatch _spriteBatch;
@@ -59,7 +59,7 @@ namespace EvakuacioSzimulacio
 		private string savesFolder = "saves";
 		private string _currentMapFileName = "default.csv";
 		
-		public Game1()
+		public SimulationCore()
 		{
 			_graphics = new GraphicsDeviceManager(this);
 			_graphics.PreferredBackBufferWidth = 1920;

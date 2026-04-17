@@ -1,2 +1,2 @@
-﻿using var game = new EvakuacioSzimulacio.Game1();
+﻿using var game = new EvakuacioSzimulacio.SimulationCore();
 game.Run();
